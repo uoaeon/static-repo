@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>系统管理后台</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: #f0f2f5;
+            font-size: 0.9rem;
+        }
+
+        .card-stat {
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            padding: 15px;
+            background: #fff;
+        }
+
+        .stat-title {
+            font-size: 0.85rem;
+            color: #6c757d;
+            margin-bottom: 5px;
+        }
+
+        .stat-main {
+            font-size: 1.6rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .stat-sub {
+            font-size: 0.8rem;
+            color: #adb5bd;
+            margin-top: 5px;
+        }
+
+        .proc-panel {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        tr.selected {
+            background-color: #e8f0fe !important;
+        }
+
+        .btn-ghost {
+            border: 1px solid #ced4da;
+            color: #495057;
+            background: transparent;
+            padding: 2px 8px;
+            font-size: 0.8rem;
+        }
+
+        .btn-ghost:hover {
+            background: #e9ecef;
+        }
+
+        .btn-ghost-red {
+            border: 1px solid #dc3545;
+            color: #dc3545;
+            background: transparent;
+            padding: 2px 8px;
+            font-size: 0.8rem;
+        }
+
+        .btn-ghost-red:hover {
+            background: #dc3545;
+            color: #fff;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container py-4">
+        <div class="d-flex justify-content-between mb-4">
+            <h4 class="fw-bold">📊 Linux 资源监控</h4>
+            <span id="status-badge" class="badge bg-secondary align-self-center">加载中…</span>
+        </div>
+
+        <!-- 总览区域 -->
+        <div class="row g-3">
+            <div class="col-md-3">
+                <div class="card-stat">
+                    <div class="stat-title">CPU</div>
+                    <div class="d-flex align-items-baseline">
+                        <span class="stat-main" id="cpu-u">0%</span>
+                        <span class="ms-2 small text-muted">已使用</span>
+                    </div>
+                    <div class="stat-sub">Load: <span id="cpu-l">-</span></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card-stat">
+                    <div class="stat-title">内存</div>
+                    <div class="d-flex align-items-baseline">
+                        <span class="stat-main" id="mem-r">0%</span>
+                        <span class="ms-2 small text-muted">已使用</span>
+                    </div>
+                    <div class="stat-sub"><span id="mem-u">0</span> / <span id="mem-t">0</span></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card-stat">
+                    <div class="stat-title">磁盘</div>
+                    <div class="d-flex align-items-baseline">
+                        <span class="stat-main" id="d-r">0%</span>
+                        <span class="ms-2 small text-muted">已使用</span>
+                    </div>
+                    <div class="stat-sub"><span id="d-u">-</span> / <span id="d-t">-</span></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card-stat">
+                    <div class="stat-title">网络</div>
+                    <div class="d-flex flex-column">
+                        <div class="fw-bold" id="net-in">入站: 0 B</div>
+                        <div class="fw-bold" id="net-out">出站: 0 B</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 进程管理 -->
+        <div class="proc-panel">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">进程监控列表</h5>
+                <div class="d-flex gap-2">
+                    <input type="text" id="s-input" class="form-control form-control-sm" placeholder="搜索PID、进程名或用户"
+                        style="width: 200px;">
+                    <button class="btn btn-sm btn-outline-primary" onclick="loadProcs()">刷新</button>
+                </div>
+            </div>
+            <div class="mb-2">
+                <button class="btn-ghost" onclick="doAct('stop')">暂停</button>
+                <button class="btn-ghost" onclick="doAct('cont')">继续</button>
+                <button class="btn-ghost" onclick="doAct('term')">结束</button>
+                <button class="btn-ghost-red" onclick="doAct('kill')">强制杀死</button>
+            </div>
+            <div class="table-responsive" style="height: 450px; overflow-y: auto;">
+                <table class="table table-sm table-hover">
+                    <thead class="table-light sticky-top">
+                        <tr>
+                            <th width="30"><input type="checkbox" id="c-all"></th>
+                            <th onclick="sort('pid')">PID ⇅</th>
+                            <th onclick="sort('cmd')">名称 ⇅</th>
+                            <th onclick="sort('user')">用户 ⇅</th>
+                            <th onclick="sort('cpu')">CPU ⇅</th>
+                            <th onclick="sort('mem')">内存 ⇅</th>
+                            <th onclick="sort('dr')">磁盘读 ⇅</th>
+                            <th onclick="sort('dw')">磁盘写 ⇅</th>
+                            <th onclick="sort('net')">网络连接 ⇅</th>
+                        </tr>
+                    </thead>
+                    <tbody id="p-body">
+                        <tr>
+                            <td colspan="9" class="text-center text-muted">加载中…</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="text-muted small mt-2">
+                <!-- 注: <b>磁盘读/写</b>为物理字节累计值; <b>网络连接</b>为进程持有的Socket句柄数(反映网络活跃度)。-->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let rawData = [];
+        let sel = new Set();
+        let sCol = 'cpu', sAsc = false;
+
+        const fmtB = (bytes) => {
+            if (!+bytes) return '0 B';
+            const k = 1024, i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + ['B', 'KB', 'MB', 'GB'][i];
+        };
+
+        const update = async () => {
+            try {
+                const res = await fetch('/api/stats');
+                const d = await res.json();
+                document.getElementById('status-badge').className = 'badge bg-success align-self-center';
+                document.getElementById('status-badge').innerText = '连接正常';
+
+                document.getElementById('cpu-u').innerText = d.cpu_u + '%';
+                document.getElementById('cpu-l').innerText = d.cpu_l;
+                document.getElementById('mem-r').innerText = d.mem_r + '%';
+                document.getElementById('mem-u').innerText = fmtB(d.mem_u * 1024 * 1024);
+                document.getElementById('mem-t').innerText = fmtB(d.mem_t * 1024 * 1024);
+                document.getElementById('d-r').innerText = d.d_r + '%';
+                document.getElementById('d-u').innerText = d.d_u + 'B';
+                document.getElementById('d-t').innerText = d.d_t + 'B';
+                document.getElementById('net-in').innerText = '入站: ' + fmtB(d.rx);
+                document.getElementById('net-out').innerText = '出站: ' + fmtB(d.tx);
+            } catch (e) {
+                document.getElementById('status-badge').className = 'badge bg-secondary align-self-center';
+                document.getElementById('status-badge').innerText = '加载中…';
+            }
+        };
+
+        const loadProcs = async () => {
+            try {
+                const res = await fetch('/api/procs');
+                rawData = await res.json();
+                render();
+            } catch (e) { }
+        };
+
+        const render = () => {
+            const term = document.getElementById('s-input').value.toLowerCase();
+            let data = rawData.filter(p => p.pid.includes(term) || p.cmd.toLowerCase().includes(term) || p.user.includes(term));
+
+            data.sort((a, b) => {
+                let va = a[sCol], vb = b[sCol];
+                if (['pid', 'cpu', 'mem', 'dr', 'dw', 'net'].includes(sCol)) { va = parseFloat(va); vb = parseFloat(vb); }
+                return sAsc ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
+            });
+
+            let html = '';
+            data.forEach(p => {
+                const chk = sel.has(p.pid) ? 'checked' : '';
+                const cls = sel.has(p.pid) ? 'selected' : '';
+                html += `
+<tr class="${cls}">
+                <td><input type="checkbox" ${chk} onchange="tgl('${p.pid}')"></td>
+                <td>${p.pid}</td>
+                <td class="text-truncate" style="max-width:120px" title="${p.cmd}">${p.cmd}</td>
+                <td>${p.user}</td>
+                <td>${p.cpu}</td>
+                <td>${p.mem}</td>
+                <td>${fmtB(p.dr)}</td>
+                <td>${fmtB(p.dw)}</td>
+                <td>${p.net}</td>
+            </tr>`;
+            });
+            document.getElementById('p-body').innerHTML = html;
+
+            // 同步表头复选框的半选状态
+            const cAll = document.getElementById('c-all');
+            if (data.length === 0) {
+                cAll.checked = false;
+                cAll.indeterminate = false;
+            } else if (data.every(p => sel.has(p.pid))) {
+                cAll.checked = true;
+                cAll.indeterminate = false;
+            } else if (data.some(p => sel.has(p.pid))) {
+                cAll.checked = false;
+                cAll.indeterminate = true;
+            } else {
+                cAll.checked = false;
+                cAll.indeterminate = false;
+            }
+        };
+
+        const tgl = (pid) => { sel.has(pid) ? sel.delete(pid) : sel.add(pid); render(); };
+        const sort = (c) => { sCol === c ? sAsc = !sAsc : (sCol = c, sAsc = false); render(); };
+
+        document.getElementById('c-all').onchange = (e) => {
+            const term = document.getElementById('s-input').value.toLowerCase();
+            const visible = rawData.filter(p => p.pid.includes(term));
+            visible.forEach(p => e.target.checked ? sel.add(p.pid) : sel.delete(p.pid));
+            render();
+        };
+        document.getElementById('s-input').oninput = render;
+
+        const doAct = async (act) => {
+            if (!sel.size || !confirm('确认操作?')) return;
+            const pids = Array.from(sel).join(',');
+            await fetch(`/api/action?action=${act}&pids=${pids}`, { method: 'POST' });
+            sel.clear();
+            setTimeout(loadProcs, 500);
+        };
+
+        setInterval(update, 2000);
+        setInterval(loadProcs, 5000);
+        update(); loadProcs();
+    </script>
+</body>
+
+</html>
